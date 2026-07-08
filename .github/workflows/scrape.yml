@@ -1,0 +1,34 @@
+name: Scrape parking data
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every 10 min UTC; actual start drifts a few minutes
+  workflow_dispatch: # manual "Run workflow" button for testing
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Collect snapshot
+        run: python3 scrape.py
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          git diff --cached --quiet && exit 0
+          git commit -m "snapshot $(date -u +'%Y-%m-%dT%H:%MZ')"
+          git push || (git pull --rebase && git push)
